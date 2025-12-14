@@ -214,17 +214,10 @@ export interface BatchResult {
  * Configuration options for BlindAI client.
  */
 export interface BlindAIConfig {
-  /** API key for authentication. Not required in sandbox mode. */
-  apiKey?: string;
+  /** API key for authentication */
+  apiKey: string;
   /** Base URL for the API (default: https://api.blindai.dev) */
   baseUrl?: string;
-  /** 
-   * Enable sandbox mode for testing. 
-   * - Returns predictable responses
-   * - No API key required
-   * - Does not count against rate limits
-   */
-  sandbox?: boolean;
   /** Default policies to apply */
   defaultPolicies?: Policy[];
   /** Default violation action */
@@ -360,12 +353,8 @@ class HTTPClient {
   private readonly debug: boolean;
 
   constructor(config: BlindAIConfig) {
-    // Use sandbox URL if sandbox mode enabled
-    const defaultUrl = config.sandbox 
-      ? 'https://web-production-b14fb.up.railway.app/sandbox'
-      : 'https://api.blindai.dev';
-    this.baseUrl = config.baseUrl?.replace(/\/$/, '') ?? defaultUrl;
-    this.apiKey = config.apiKey ?? (config.sandbox ? 'sandbox_key' : '');
+    this.baseUrl = config.baseUrl?.replace(/\/$/, '') ?? 'https://api.blindai.dev';
+    this.apiKey = config.apiKey;
     this.timeout = config.timeout ?? 30000;
     this.maxRetries = config.maxRetries ?? 3;
     this.debug = config.debug ?? false;
@@ -516,7 +505,7 @@ export class BlindAI {
    * ```
    */
   constructor(config: BlindAIConfig) {
-    if (!config.apiKey && !config.sandbox) {
+    if (!config.apiKey) {
       throw new ConfigurationError(
         'API key is required. Get one at https://app.blindai.dev/settings/api-keys'
       );
