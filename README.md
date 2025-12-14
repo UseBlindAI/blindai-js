@@ -433,5 +433,5 @@ MIT © BlindAI
 
 - [Documentation](https://docs.blindai.dev)
 - [Dashboard](https://app.blindai.dev)
-- [Python SDK](https://pypi.org/project/blind-ai/)
-- [GitHub](https://github.com/blindai/sdk-typescript)
+- [Python SDK](https://github.com/UseBlindAI/blindai-python)
+- [GitHub](https://github.com/UseBlindAI/blindai-js)
