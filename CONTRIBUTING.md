@@ -56,7 +56,7 @@ pnpm build
 
 ```bash
 # Run tests
-pnpm test
+npm test
 
 # Type checking
 pnpm typecheck
@@ -113,7 +113,7 @@ chore: update dependencies
 
 1. **Ensure tests pass**:
    ```bash
-   pnpm test
+   npm test
    pnpm typecheck
    pnpm lint
    ```
@@ -183,13 +183,13 @@ throw new Error('bad config');
 
 ```bash
 # All tests
-pnpm test
+npm test
 
 # Watch mode
-pnpm test:watch
+npm run test:contract
 
 # Coverage
-pnpm test:coverage
+npm run check
 ```
 
 ### Writing Tests

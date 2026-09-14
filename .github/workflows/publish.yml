@@ -1,0 +1,107 @@
+name: publish
+
+# Tag-triggered release. Both invariants gate the publish, and that placement is the point:
+# this is the last moment before a version becomes installable, and npm versions are immutable.
+# A bypass that ships cannot be unshipped -- it can only be deprecated while everyone who already
+# installed it keeps running it.
+on:
+  push:
+    tags: ['v*']
+
+jobs:
+  # Invariant 1 of 2 — static. No allow may be fabricated anywhere but the response parser.
+  no-fail-open:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node scripts/no-fail-open.mjs
+
+  # Invariant 2 of 2 — behavioural. No answer without a question, and no reused answer.
+  every-call-asks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: node --test test/every-call-asks.test.js
+
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run typecheck:examples
+      - run: npm run build
+      - run: npm test
+      # The tag must match the version being published, or the registry and the repository
+      # disagree about what a release contains and neither is obviously wrong.
+      - name: Tag matches package version
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_REF_NAME#v}"
+          pkg="$(node -p "require('./package.json').version")"
+          if [ "$tag" != "$pkg" ]; then
+            echo "::error::tag v$tag does not match package.json version $pkg"
+            exit 1
+          fi
+          echo "ok: publishing $pkg"
+
+  # The tag gate that needs a real server. Nothing is published without having been run against one
+  # at least once, and a missing secret FAILS this job rather than skipping it -- so "we never
+  # checked" can never look like a green release. The contract tests assert that /v1/authorize and
+  # /v1/scan exist, that both auth styles work, that /api/v1/check is gone, and that a bad key
+  # raises rather than returning a decision.
+  contract:
+    runs-on: ubuntu-latest
+    env:
+      BLINDAI_BASE_URL: ${{ secrets.BLINDAI_CONTRACT_BASE_URL }}
+      BLINDAI_API_KEY: ${{ secrets.BLINDAI_CONTRACT_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Secrets must exist
+        run: |
+          set -euo pipefail
+          missing=
+          [ -n "${BLINDAI_BASE_URL:-}" ] || missing="$missing BLINDAI_CONTRACT_BASE_URL"
+          [ -n "${BLINDAI_API_KEY:-}" ] || missing="$missing BLINDAI_CONTRACT_API_KEY"
+          if [ -n "$missing" ]; then
+            echo "::error::cannot publish without running against a real server; missing secret(s):$missing"
+            exit 1
+          fi
+      - run: npm ci
+      - run: npm run test:contract
+
+  publish:
+    runs-on: ubuntu-latest
+    needs: [no-fail-open, every-call-asks, verify, contract]
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          registry-url: 'https://registry.npmjs.org'
+      - run: npm ci
+      - run: npm run build
+      - run: npm publish --access public --provenance
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

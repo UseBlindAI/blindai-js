@@ -1,0 +1,68 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run build
+      - run: npm test
+
+  # Invariant 1 of 2. Static: the client may produce an allow-shaped value in exactly one place,
+  # the response parser. Catches a fabricated allow -- a permissive literal, including a dataclass
+  # or parameter default. It structurally cannot see a call that never asked, which is why the
+  # second job exists.
+  no-fail-open:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node scripts/no-fail-open.mjs
+
+  # Invariant 2 of 2. Behavioural: every public call either makes exactly one request or raises,
+  # and the decision returned was built from the body served for THAT request, proven by a
+  # per-response nonce. Catches the two things the static check cannot -- a call that never asked
+  # (a rollout that skips traffic) and a reused answer (a verdict cache).
+  every-call-asks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: node --test test/every-call-asks.test.js
+
+  # Runs against a real deployment. Expected to be red until the two secrets exist and the
+  # deployment is reachable; that is the point. A missing secret fails the job rather than skipping
+  # it, so a green build can never mean "we never checked".
+  contract:
+    runs-on: ubuntu-latest
+    needs: [build, no-fail-open, every-call-asks]
+    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
+    env:
+      BLINDAI_BASE_URL: ${{ secrets.BLINDAI_CONTRACT_BASE_URL }}
+      BLINDAI_API_KEY: ${{ secrets.BLINDAI_CONTRACT_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm run test:contract
