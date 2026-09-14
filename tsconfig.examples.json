@@ -1,0 +1,15 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    // The examples import "@blindai/sdk" because that is what a reader will write. Mapping it to
+    // the source here means they are typechecked against the real surface rather than against a
+    // published build that may be older than the code beside them.
+    "paths": {
+      "@blindai/sdk": ["./src/index.ts"],
+      "@blindai/sdk/testing": ["./src/testing/index.ts"]
+    },
+    "types": ["node"],
+    "noEmit": true
+  },
+  "include": ["examples/**/*.ts", "src/**/*.ts"]
+}

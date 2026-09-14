@@ -1,52 +1,14 @@
-# BlindAI TypeScript SDK Examples
+# Examples
 
-This folder contains runnable examples demonstrating BlindAI SDK features.
+All three are typechecked in CI against the source next to them (`npm run typecheck:examples`), so
+an example that does not compile cannot be tagged.
 
-## Quick Start
+| File | Shows |
+|---|---|
+| `quickstart.ts` | The smallest useful integration: gate one tool call, and handle the errors that mean authorization was unavailable. |
+| `with-openai.ts` | The shape inside an agent loop — authorize *before* the tool runs, and treat a throw as "do not run it". |
+| `testing.ts` | Testing your integration without a server, including the two cases usually skipped: the server being down, and a response that is not a decision. |
 
-```bash
-# Install dependencies
-npm install @blindai/sdk
-
-# Set your API key
-export BLINDAI_API_KEY="your-api-key"
-
-# Run an example
-npx tsx examples/quickstart.ts
-```
-
-## Examples
-
-| File | Description |
-|------|-------------|
-| [quickstart.ts](quickstart.ts) | Basic usage: check, protect, batch, wrap |
-| [with-openai.ts](with-openai.ts) | Integration with OpenAI SDK |
-| [testing.ts](testing.ts) | MockBlindAI and testing utilities |
-
-## Running Examples
-
-All examples use [tsx](https://github.com/esbuild-kit/tsx) for TypeScript execution:
-
-```bash
-npx tsx examples/quickstart.ts
-npx tsx examples/with-openai.ts
-npx tsx examples/testing.ts
-```
-
-## Environment Setup
-
-Set your API key before running examples:
-
-```bash
-export BLINDAI_API_KEY="your-api-key"
-```
-
-Or in your code:
-
-```typescript
-import { BlindAI } from '@blindai/sdk';
-
-const guard = new BlindAI({
-  apiKey: 'your-api-key',
-});
-```
+They import `@blindai/sdk` because that is what you will write. In this repository that name is
+mapped to `src/` so the examples are checked against the real surface rather than a published build
+that may be older than the code beside them.
