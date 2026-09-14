@@ -100,8 +100,15 @@ jobs:
           node-version: '22'
           cache: npm
           registry-url: 'https://registry.npmjs.org'
+      # npm trusted publishing: the workflow authenticates to the registry over OIDC, so there is
+      # no token to rotate, leak, or commit. `id-token: write` above is what makes that possible,
+      # and it is also what signs the provenance attestation. A long-lived NPM_TOKEN in a repo
+      # secret would be the same shape as the database credential this project already has to
+      # rotate -- a durable secret sitting where a workflow file can reach it.
+      #
+      # Requires a trusted publisher configured on npmjs.com for @blindai/sdk, naming this
+      # repository and this workflow file. Without it the publish fails, which is correct: the
+      # alternative is a token.
       - run: npm ci
       - run: npm run build
       - run: npm publish --access public --provenance
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
