@@ -6,6 +6,8 @@ Fail-closed TypeScript client for the BlindAI authorization API.
 npm install @blindai/sdk
 ```
 
+> **Not yet published.** `@blindai/sdk` is not on npm; the line above is what it will be. Until the first release, install from this repository. Publishing is gated on both invariants and a contract run against a real deployment (see *Testing*), so the package appears when those pass and not before.
+
 ```ts
 import { BlindAIClient } from '@blindai/sdk';
 
