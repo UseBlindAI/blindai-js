@@ -11,11 +11,14 @@ import {
 import { parseDecision } from './parse.js';
 import type {
   AuthorizeRequest,
+  CallOptions,
   ClientOptions,
   Decision,
   RAGScanRequest,
   RAGScanResponse,
+  TokenGrant,
 } from './types.js';
+import { IDENTITY_HEADER, TOKENS_PATH } from './wire.js';
 
 const RETRYABLE_STATUSES = new Set([408, 429, 500, 502, 503, 504]);
 
@@ -59,14 +62,34 @@ export class BlindAIClient {
     this.fetchImpl = f;
   }
 
-  /** POST /v1/authorize */
-  authorize(request: AuthorizeRequest): Promise<Decision> {
-    return this.post('/v1/authorize', request);
+  /**
+   * POST /v1/authorize
+   *
+   * `options.identityToken`: the agent's token from {@link exchangeTokens}. A tool call needs one on
+   * a deployment whose control plane is on; without it the call is refused `identity_token_required`.
+   */
+  authorize(request: AuthorizeRequest, options: CallOptions = {}): Promise<Decision> {
+    return this.post('/v1/authorize', request, options);
   }
 
   /** POST /v1/scan — identical models to /v1/authorize. */
-  scan(request: AuthorizeRequest): Promise<Decision> {
-    return this.post('/v1/scan', request);
+  scan(request: AuthorizeRequest, options: CallOptions = {}): Promise<Decision> {
+    return this.post('/v1/scan', request, options);
+  }
+
+  /**
+   * POST /v1/cp/tokens: a runtime's secret for its agents' identity tokens.
+   *
+   * Exactly one request, or a throw. An agent id the runtime does not own, or that is not active,
+   * is absent from the grant rather than an error (the server's rule: no probing for agents).
+   */
+  async exchangeTokens(runtimeSecret: string, agentIds: string[]): Promise<TokenGrant> {
+    if (!runtimeSecret) throw new BlindAIError('runtimeSecret is required');
+    const body = await this.sendJson(
+      TOKENS_PATH,
+      JSON.stringify({ runtime_secret: runtimeSecret, agent_ids: agentIds }),
+    );
+    return parseTokenGrant(body);
   }
 
   /**
@@ -112,32 +135,36 @@ export class BlindAIClient {
     );
   }
 
-  private headers(): Record<string, string> {
+  private headers(extra: Record<string, string> = {}): Record<string, string> {
     const h: Record<string, string> = {
       'content-type': 'application/json',
       accept: 'application/json',
     };
     if (this.authStyle === 'bearer') h.authorization = `Bearer ${this.apiKey}`;
     else h['x-api-key'] = this.apiKey;
-    return h;
+    return { ...h, ...extra };
   }
 
-  private async post(path: string, body: AuthorizeRequest): Promise<Decision> {
+  private async post(path: string, body: AuthorizeRequest, options: CallOptions): Promise<Decision> {
     if (!body || typeof body.input_text !== 'string' || body.input_text.length === 0) {
       throw new BlindAIError('input_text is required and must be a non-empty string');
     }
-    return parseDecision(await this.sendJson(path, JSON.stringify(body)));
+    return parseDecision(await this.sendJson(path, JSON.stringify(body), identity(options)));
   }
 
   /** POST with retry. Retries transport failures, 5xx, 408 and 429 only. */
-  private async sendJson(path: string, payload: string): Promise<unknown> {
+  private async sendJson(
+    path: string,
+    payload: string,
+    extra: Record<string, string> = {},
+  ): Promise<unknown> {
     const url = `${this.baseUrl}${path}`;
     let lastError: BlindAIError | undefined;
 
     for (let attempt = 0; attempt <= this.maxRetries; attempt++) {
       if (attempt > 0) await sleep(this.retryBaseMs * 2 ** (attempt - 1));
       try {
-        return await this.send(url, payload);
+        return await this.send(url, payload, extra);
       } catch (err) {
         const e = err instanceof BlindAIError ? err : new TransportError(String(err), err);
         const retryable = e instanceof TransportError || (e instanceof ApiError && e.retryable);
@@ -149,14 +176,14 @@ export class BlindAIClient {
     throw lastError ?? new TransportError('Request failed');
   }
 
-  private async send(url: string, payload: string): Promise<unknown> {
+  private async send(url: string, payload: string, extra: Record<string, string>): Promise<unknown> {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), this.timeoutMs);
     let response: Response;
     try {
       response = await this.fetchImpl(url, {
         method: 'POST',
-        headers: this.headers(),
+        headers: this.headers(extra),
         body: payload,
         signal: controller.signal,
       });
@@ -226,6 +253,31 @@ export class BlindAIClient {
     const detail = (body as { detail?: unknown } | null)?.detail;
     return typeof detail === 'string' ? detail : null;
   }
+}
+
+/** The identity header, only when a token is held: never sent empty (wire-constants.json). */
+function identity(options: CallOptions): Record<string, string> {
+  const token = options.identityToken;
+  if (token === undefined || token === null) return {};
+  if (typeof token !== 'string' || token.trim() === '') {
+    throw new BlindAIError('identityToken must be a non-empty string, or omitted');
+  }
+  return { [IDENTITY_HEADER]: token };
+}
+
+function parseTokenGrant(body: unknown): TokenGrant {
+  const b = body as { tokens?: unknown; expires_in?: unknown } | null;
+  if (!b || typeof b.tokens !== 'object' || b.tokens === null || Array.isArray(b.tokens)) {
+    throw new ContractError("not a token grant: missing 'tokens'");
+  }
+  const tokens = b.tokens as Record<string, unknown>;
+  if (!Object.values(tokens).every((v) => typeof v === 'string')) {
+    throw new ContractError("not a token grant: 'tokens' must map agent ids to strings");
+  }
+  if (typeof b.expires_in !== 'number' || !Number.isInteger(b.expires_in)) {
+    throw new ContractError("not a token grant: 'expires_in' is not an integer");
+  }
+  return { tokens: { ...(tokens as Record<string, string>) }, expiresIn: b.expires_in };
 }
 
 function sleep(ms: number): Promise<void> {
