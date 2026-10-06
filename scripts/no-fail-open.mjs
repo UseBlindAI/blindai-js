@@ -14,7 +14,13 @@
  *      path through -- found re-pointing this client at the control plane (BlindAI pilot S,
  *      2026-10-06), where `authorize` returning `{ blocked: false }` for some input passed.
  *      Exempt: src/types.ts (declarations) and src/testing/ (builds server-shaped BODIES, which
- *      still reach the client through parseDecision).
+ *      still reach the client through parseDecision). The exemptions are held to that, after the
+ *      cold review of this rule (blindai-js#3):
+ *   4. No src file outside src/testing/ imports from it: `parseDecision(decision.allow().body)` in
+ *      the client would otherwise be an allow the server never gave, built from shipped helpers.
+ *   5. src/types.ts exports no values (const, let, var, function, class, enum, default): exempt
+ *      because it only declares, so it must only declare.
+ *   Keys are matched quoted or not: `"blocked": false` is the same allow as `blocked: false`.
  */
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
@@ -31,7 +37,12 @@ const files = [];
 
 const forbiddenOptions = /\b(continueOnError|failOpen|fail_open|onErrorAllow|defaultAction)\b/;
 // catch (...) { ... allow ... } within a bounded window, ignoring comments
-const allowLiteral = /(blocked:\s*false|allowed:\s*true|action:\s*['"]allow['"]|isThreat:\s*false)/;
+const q = `["'\`]?`;
+const allowLiteral = new RegExp(
+  `(${q}blocked${q}\\s*:\\s*false|${q}allowed${q}\\s*:\\s*true|${q}action${q}\\s*:\\s*['"\`]allow['"\`]|${q}isThreat${q}\\s*:\\s*false)`,
+);
+const testingImport = /from\s+['"][^'"]*\/testing(?:\/[^'"]*)?(?:\.js)?['"]|import\(\s*['"][^'"]*\/testing/;
+const valueExport = /\bexport\s+(?:default\b|const\b|let\b|var\b|function\b|async\s+function\b|class\b|enum\b)/;
 const parserOrExempt = (rel) =>
   rel.endsWith('src/parse.ts') || rel.endsWith('src/types.ts') || rel.includes('src/testing/');
 const catchAllow = /catch\s*(\([^)]*\))?\s*\{[^}]{0,400}(action:\s*['"]allow['"]|blocked:\s*false|isThreat:\s*false)/s;
@@ -47,6 +58,14 @@ for (const f of files) {
   if (m2) { console.error(`::error file=${rel}::a catch block appears to produce an allow`); failed = true; }
   const m3 = parserOrExempt(rel) ? null : code.match(allowLiteral);
   if (m3) { console.error(`::error file=${rel}::an allow-shaped value ("${m3[1]}") outside the response parser`); failed = true; }
+  if (!rel.includes('src/testing/') && testingImport.test(code)) {
+    console.error(`::error file=${rel}::imports the shipped testing helpers, which build allow-shaped bodies`);
+    failed = true;
+  }
+  if (rel.endsWith('src/types.ts') && valueExport.test(code)) {
+    console.error(`::error file=${rel}::exports a value; types.ts is exempt from rule 3 only because it declares`);
+    failed = true;
+  }
 }
 if (failed) process.exit(1);
 console.log(`ok: ${files.length} source files, no fail-open paths`);
