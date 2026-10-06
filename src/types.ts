@@ -116,3 +116,16 @@ export interface RAGScanResponse {
   unsafe_count: number;
   flagged_indices: number[];
 }
+
+/** Per-call options that are not part of the request body. */
+export interface CallOptions {
+  /** The agent's identity token (see `BlindAIClient.exchangeTokens`). Sent as X-BlindAI-Identity. */
+  identityToken?: string;
+}
+
+/** Identity tokens for a runtime's agents, as `/v1/cp/tokens` granted them. */
+export interface TokenGrant {
+  tokens: Record<string, string>;
+  /** Seconds. */
+  expiresIn: number;
+}

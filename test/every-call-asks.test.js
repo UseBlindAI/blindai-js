@@ -61,6 +61,10 @@ const CALLS = [
   ['authorize', (c) => c.authorize({ input_text: 'hello' }), undefined],
   ['scan', (c) => c.scan({ input_text: 'hello' }), undefined],
   ['ragScan', (c) => c.ragScan({ documents: [{ content: 'hello' }] }), () => RAG_BODY],
+  ['authorize with an identity token',
+    (c) => c.authorize({ input_text: 'pay', tool: 'pay' }, { identityToken: 'tok' }), undefined],
+  ['exchangeTokens', (c) => c.exchangeTokens('rs_secret', ['a-1']),
+    () => ({ tokens: { 'a-1': 'tok' }, expires_in: 60 })],
 ];
 
 for (const [name, invoke, bodyFor] of CALLS) {
@@ -119,4 +123,14 @@ test('the decision is built from the body served for THIS request, not an earlie
   assert.equal(first.raw.request_id, state.nonces[0]);
   assert.equal(second.raw.request_id, state.nonces[1],
     'the second decision carried the first response back: an answer was reused');
+});
+
+// A token cache is a cache of an identity decision: a revoked agent would keep its token until the
+// cache said otherwise. Each exchange is its own request.
+test('a second exchange asks again', async () => {
+  const { state, fetchImpl } = countingFetch(() => ({ tokens: { 'a-1': 'tok' }, expires_in: 60 }));
+  const c = client(fetchImpl);
+  await c.exchangeTokens('rs_secret', ['a-1']);
+  await c.exchangeTokens('rs_secret', ['a-1']);
+  assert.equal(state.requests, 2);
 });

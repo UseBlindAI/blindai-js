@@ -11,6 +11,7 @@ export {
   ContractError,
 } from './errors.js';
 export { parseDecision } from './parse.js';
+export { IDENTITY_HEADER } from './wire.js';
 export type {
   AuthorizeRequest,
   AuthorizeResponse,
@@ -19,4 +20,6 @@ export type {
   ClientOptions,
   Role,
   Preset,
+  CallOptions,
+  TokenGrant,
 } from './types.js';
