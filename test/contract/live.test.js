@@ -40,10 +40,16 @@ test('POST /v1/authorize exists and returns a parseable decision', async () => {
   assert.equal(typeof d.latencyMs, 'number');
 });
 
-test('POST /v1/scan exists and takes the identical models', async () => {
-  const d = await client().scan({ input_text: 'What is the weather today?' });
-  assert.equal(typeof d.blocked, 'boolean');
-});
+for (const path of ['/v1/scan', '/v1/rag/scan']) {
+  test(`${path} is gone: removed from the API on 2026-10-11 and answers 404`, async () => {
+    const r = await fetch(`${baseUrl.replace(/\/$/, '')}${path}`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ input_text: 'x', documents: [] }),
+    });
+    assert.equal(r.status, 404, `expected 404 from ${path}, got ${r.status}`);
+  });
+}
 
 test('both auth styles are accepted', async () => {
   for (const authStyle of ['bearer', 'x-api-key']) {
