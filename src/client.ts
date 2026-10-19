@@ -14,8 +14,6 @@ import type {
   CallOptions,
   ClientOptions,
   Decision,
-  RAGScanRequest,
-  RAGScanResponse,
   TokenGrant,
 } from './types.js';
 import { IDENTITY_HEADER, TOKENS_PATH } from './wire.js';
@@ -72,11 +70,6 @@ export class BlindAIClient {
     return this.post('/v1/authorize', request, options);
   }
 
-  /** POST /v1/scan — identical models to /v1/authorize. */
-  scan(request: AuthorizeRequest, options: CallOptions = {}): Promise<Decision> {
-    return this.post('/v1/scan', request, options);
-  }
-
   /**
    * POST /v1/cp/tokens: a runtime's secret for its agents' identity tokens.
    *
@@ -90,26 +83,6 @@ export class BlindAIClient {
       JSON.stringify({ runtime_secret: runtimeSecret, agent_ids: agentIds }),
     );
     return parseTokenGrant(body);
-  }
-
-  /**
-   * POST /v1/rag/scan
-   *
-   * Different models from authorize: this returns document counts and flagged
-   * indices, not a decision. It still throws on any failure.
-   */
-  async ragScan(request: RAGScanRequest): Promise<RAGScanResponse> {
-    if (!request || !Array.isArray(request.documents)) {
-      throw new BlindAIError('documents is required and must be an array');
-    }
-    const body = await this.sendJson('/v1/rag/scan', JSON.stringify(request));
-    const b = body as Record<string, unknown>;
-    if (typeof b?.threats_found !== 'boolean' || !Array.isArray(b?.flagged_indices)) {
-      throw new ContractError(
-        'Response did not carry threats_found and flagged_indices; refusing to infer a result',
-      );
-    }
-    return b as unknown as RAGScanResponse;
   }
 
   /**

@@ -55,8 +55,6 @@ the error and make that decision in your own code, where a reviewer can see it.
 | `fetch` | no | global | For tests or a custom agent |
 
 ### `authorize(request)` → `Decision` · `POST /v1/authorize`
-### `scan(request)` → `Decision` · `POST /v1/scan` (identical models)
-### `ragScan(request)` → `RAGScanResponse` · `POST /v1/rag/scan`
 ### `authorizeBatch(requests)` → `BatchItem[]`
 
 Each item is `{ ok: true, index, decision }` or `{ ok: false, index, error }`.
@@ -135,6 +133,6 @@ BLINDAI_BASE_URL=… BLINDAI_API_KEY=… npm run test:contract
 Contract tests run against a real server and **fail** when `BLINDAI_BASE_URL`
 and `BLINDAI_API_KEY` are absent, so a green build cannot mean "we never
 checked". Set `BLINDAI_CONTRACT_OPTIONAL=1` to skip them locally; CI must not.
-They assert that `/v1/authorize` and `/v1/scan` exist, that both auth styles
+They assert that `/v1/authorize` exists and `/v1/scan` and `/v1/rag/scan` do not, that both auth styles
 work, that `/api/v1/check` returns 404, and that a bad key raises rather than
 returning a decision.

@@ -50,17 +50,10 @@ function client(fetchImpl, extra = {}) {
   });
 }
 
-const RAG_BODY = {
-  threats_found: false, total_documents: 1, safe_count: 1, unsafe_count: 0, flagged_indices: [],
-};
-
-// Each call gets the body ITS endpoint returns. Serving an AuthorizeResponse to `ragScan` makes
-// the client throw, correctly — it refuses to infer a RAG result from a shape that isn't one —
-// so a stub that does it is testing the stub, not the invariant.
+// Each call gets the body ITS endpoint returns: a stub serving the wrong shape tests the stub,
+// not the invariant.
 const CALLS = [
   ['authorize', (c) => c.authorize({ input_text: 'hello' }), undefined],
-  ['scan', (c) => c.scan({ input_text: 'hello' }), undefined],
-  ['ragScan', (c) => c.ragScan({ documents: [{ content: 'hello' }] }), () => RAG_BODY],
   ['authorize with an identity token',
     (c) => c.authorize({ input_text: 'pay', tool: 'pay' }, { identityToken: 'tok' }), undefined],
   ['exchangeTokens', (c) => c.exchangeTokens('rs_secret', ['a-1']),

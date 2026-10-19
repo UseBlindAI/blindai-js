@@ -1,5 +1,5 @@
 /**
- * Wire types for POST /v1/authorize and POST /v1/scan.
+ * Wire types for POST /v1/authorize.
  *
  * These mirror the server models exactly. Do not add fields that the server
  * does not accept: there is no `metadata` field on the request.
@@ -96,25 +96,6 @@ export interface ClientOptions {
   /** 'bearer' (default) or 'x-api-key'. Both are accepted by the server. */
   authStyle?: 'bearer' | 'x-api-key';
   fetch?: typeof globalThis.fetch;
-}
-
-/** POST /v1/rag/scan */
-export interface RAGDocument {
-  content: string;
-  metadata?: Record<string, unknown> | null;
-}
-
-export interface RAGScanRequest {
-  documents: RAGDocument[];
-  threshold?: number | null;
-}
-
-export interface RAGScanResponse {
-  threats_found: boolean;
-  total_documents: number;
-  safe_count: number;
-  unsafe_count: number;
-  flagged_indices: number[];
 }
 
 /** Per-call options that are not part of the request body. */

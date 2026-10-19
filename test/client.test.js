@@ -129,12 +129,6 @@ test('x-api-key style is supported', async () => {
   assert.equal(calls[0].init.headers.authorization, undefined);
 });
 
-test('scan uses /v1/scan with the same models', async () => {
-  const { fetchImpl, calls } = stub(() => jsonResponse(200, OK));
-  await client(fetchImpl).scan({ input_text: 'hello' });
-  assert.equal(calls[0].url, 'https://example.invalid/v1/scan');
-});
-
 test('sends only the fields given: no metadata, no invented defaults', async () => {
   const { fetchImpl, calls } = stub(() => jsonResponse(200, OK));
   await client(fetchImpl).authorize({ input_text: 'x', role: 'guest' });
@@ -367,34 +361,6 @@ test('a non-JSON error body does not replace the error', async () => {
       return true;
     },
   );
-});
-
-test('ragScan posts to /v1/rag/scan and validates the result shape', async () => {
-  const body = {
-    threats_found: true,
-    total_documents: 2,
-    safe_count: 1,
-    unsafe_count: 1,
-    flagged_indices: [1],
-  };
-  const { fetchImpl, calls } = stub(() => jsonResponse(200, body));
-  const r = await client(fetchImpl).ragScan({ documents: [{ content: 'a' }, { content: 'b' }] });
-  assert.equal(calls[0].url, 'https://example.invalid/v1/rag/scan');
-  assert.deepEqual(r.flagged_indices, [1]);
-});
-
-test('ragScan throws on a body with no usable result', async () => {
-  const { fetchImpl } = stub(() => jsonResponse(200, { ok: true }));
-  await assert.rejects(
-    () => client(fetchImpl, { maxRetries: 0 }).ragScan({ documents: [{ content: 'a' }] }),
-    /refusing to infer a result/,
-  );
-});
-
-test('ragScan requires documents and does not hit the network without them', async () => {
-  const { fetchImpl, calls } = stub(() => jsonResponse(200, {}));
-  await assert.rejects(() => client(fetchImpl).ragScan({}), /documents is required/);
-  assert.equal(calls.length, 0);
 });
 
 test('viewer and foreign are valid roles and pass through', async () => {

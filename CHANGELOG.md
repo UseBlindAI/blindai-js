@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+### Removed
+- `scan()` and `ragScan()`, with the `RAGDocument`, `RAGScanRequest` and `RAGScanResponse` types.
+  The API removed `POST /v1/scan` and `POST /v1/rag/scan` on 2026-10-11 (attack-surface
+  reduction, Elisha's ruling); both answer 404 from that deploy on. `scan()` was an alias of
+  `authorize()` with the same models: call `authorize()` instead. Nothing replaces `ragScan()`
+  yet. `test/contract` now asserts both routes answer 404.
+
 - **Identity tokens** (BlindAI pilot S, 2026-10-06). `exchangeTokens(runtimeSecret, agentIds)` trades
   a runtime's secret for its agents' identity tokens at `/v1/cp/tokens`; `authorize` and `scan` take
   `{ identityToken }` as a second argument and send it as `X-BlindAI-Identity` -- only when given,
